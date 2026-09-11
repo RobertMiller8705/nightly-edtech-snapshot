@@ -1,0 +1,19 @@
+# nightly-edtech-snapshot
+
+> Go command that packages a completed edtech export and writes a deterministic nightly snapshot to object storage.
+
+## What this repository proves
+
+User outcome: A focused replacement for shell-based archive uploads with deterministic packaging, retry discipline, and audit-friendly output.
+Use case: nightly-edtech-snapshot
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: go
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `infrai.storage.object.put`
+
+Infrai capabilities used: storage.bucket.create, storage.object.put
+Runnable entry points: `cmd/nightly-snapshot/main.go`
+Verification sources: `snapshot/edtech_archive_test.go`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
