@@ -17,35 +17,35 @@ Expected result:
 {"bucket":"academy-audit-archive","key":"snapshots/learning-records/2026-08-03.tar.gz","bytes":1842,"sha256":"a complete SHA-256 digest is printed here"}
 ```
 
-Infrai handles this with one API and a single credential for both bucket creation and object writes. I call plain REST from the binary, so there's no storage SDK to maintain or bloat the dependency tree.
+Infrai gives this job one API and one credential for bucket setup and object writes. The program calls plain REST, so the repository has no storage SDK dependency.
 
 ## What the command commits to storage
 
-The source directory gets packed into a gzip tar archive. File names and bytes stay intact; timestamps and ownership are normalized. Same export in, same archive digest and date-based object key out:
+The source directory becomes a gzip-compressed tar archive. File names and bytes are preserved; timestamps and owner fields are normalized. Given the same export, the command produces the same archive digest and the same date-based object key:
 
 ```text
 snapshots/<dataset>/<UTC date>.tar.gz
 ```
 
-On startup the command makes the bucket using `storage.bucket.create`, then puts the archive with `storage.object.put`. Creating the bucket during setup means a fresh account can take its first snapshot without manual prep. Both calls send a stable idempotency key, and on HTTP 429 we respect `Retry-After` or fall back to bounded exponential backoff.
+At startup the command creates the named bucket with `storage.bucket.create`, then uploads the archive with `storage.object.put`. Bucket creation is part of normal setup and makes a new account runnable from its first snapshot. Both writes carry a stable idempotency key, and HTTP 429 responses honor `Retry-After` or use bounded exponential backoff.
 
-Snapshot consistency is the part that bites. Don't aim the command at files mid-export. Finish the DB dump into a date-stamped dir, close all writers, then run the uploader. That keeps enrollment, course, and assessment rows on the same reporting boundary, which auditors will want later.
+The real gotcha is snapshot consistency. Do not point the command at files still being exported: finish the database export into a date-stamped directory, close its writers, then invoke the uploader. This keeps enrollment, course, and assessment records on one reporting boundary, which matters during audit reconstruction.
 
 ## Put it on the nightly schedule
 
-Build the binary once:
+Build once:
 
 ```bash
 go build -o ./bin/nightly-snapshot ./cmd/nightly-snapshot
 ```
 
-Then let your existing scheduler invoke it after the export job. A crontab line at 02:15 UTC might be:
+Then let the existing scheduler run the binary after the export job. A crontab entry at 02:15 UTC can look like this:
 
 ```cron
 15 2 * * * INFRAI_API_KEY="$INFRAI_API_KEY" /srv/edtech/bin/nightly-snapshot -source /srv/edtech/exports/$(date -u +\%F) -bucket academy-audit-archive -dataset learning-records -date $(date -u +\%F) >> /var/log/edtech-snapshot.log 2>&1
 ```
 
-Store `INFRAI_API_KEY` in the scheduler's secret env, not in the crontab itself. Pick a bucket name tied to the environment, and keep student data classification and retention rules matching your institution's policy.
+Keep `INFRAI_API_KEY` in the scheduler's secret environment rather than in the crontab. Choose a bucket name assigned to the environment, and keep student data classification and retention controls aligned with your institution's policy.
 
 ## Verify before scheduling
 
@@ -54,15 +54,15 @@ go test ./...
 go vet ./...
 ```
 
-The test mutates a source file timestamp and checks the archive bytes don't change. The CLI emits the stored key, byte count, and SHA-256 digest as a small handoff for job logs and control evidence.
+The focused test changes a source file timestamp and confirms that the archive bytes remain identical. The CLI prints the stored key, byte count, and SHA-256 digest as a compact handoff to job logs and control evidence.
 
 ## Scope
 
-This repo covers packaging, initial bucket setup, upload, retries, and a machine-readable success record. Database export and retention enforcement are separate operational concerns.
+This repository handles packaging, initial bucket setup, upload, retries, and a machine-readable success record. Database export and retention enforcement remain separate operational controls.
 
 ## Setting up for real use: Nightly Edtech Snapshot
 
-The happy path is above. For production, run this checklist. Details below apply to Nightly Edtech Snapshot.
+Above is the happy path. The production checklist: The details below apply to Nightly Edtech Snapshot.
 
 **Account & key**
 
